@@ -182,15 +182,6 @@ int play_game()
 	for (rnum = 0;; ++rnum)
 	{
 		++cowmoves;
-		for (x = 0; x < agentf->count; ++x)
-		{
-			if (agentf->units[x] == agentc->units[0])
-				goto gameover;
-
-			// if a farmer touches the decoy cow, it is removed
-			if (agentc->count > 1 && agentf->units[x] == agentc->units[1])
-				agentc->count = 1;
-		}
 
 		int newfarmer = (0 == rnum % T);
 		if (newfarmer && agentf->count < MAXFARMERS)
@@ -198,6 +189,8 @@ int play_game()
 			agentf->units[agentf->count] = 0;
 			agentf->count++;
 
+			sprintf(msg, "COUNT 1 %d", agentf->count);
+			tell_all(msg, -1);
 		}
 
 		for (i = 0, a = agents; i < NUMAGENTS; ++a, ++i)
@@ -208,6 +201,17 @@ int play_game()
 
 			for (x = 0; x < a->count; ++x)
 			{
+				int k;
+				for (k = 0; k < agentf->count; ++k)
+				{
+					if (agentf->units[k] == agentc->units[0])
+						goto gameover;
+
+					// if a farmer touches the decoy cow, it is removed
+					if (agentc->count > 1 && agentf->units[k] == agentc->units[1])
+						agentc->count = 1;
+				}
+
 				unsigned int baseavail = 1;
 				unsigned int *availmoves = &baseavail;
 
@@ -219,7 +223,8 @@ int play_game()
 					update_bcb_vis(NUMAGENTS, agents, rnum);
 					a->mooed[x] = 0;
 
-					unsigned int row, col, loc = a->units[x];
+					unsigned int row, col, loc = a->units[x], prev;
+					prev = loc;
 					sprintf(msg, "MOVE %d %d %d", x, loc / BOARDSIZE, loc % BOARDSIZE);
 					tell_bot(msg, i);
 
@@ -234,18 +239,28 @@ int play_game()
 					if (col < 0) col = 0;
 					if (col >= BOARDSIZE) col = BOARDSIZE - 1;
 
-					int distrow = abs(loc / BOARDSIZE - row);
-					int distcol = abs(loc % BOARDSIZE - col);
+					loc = row * BOARDSIZE + col;
+					if (a == agentf && (loc == loc_cloak || loc == loc_flwrs 
+						|| loc == loc_decoy || loc == loc_telep)) loc = prev;
+
+					int distrow = abs(prev / BOARDSIZE - row);
+					int distcol = abs(prev % BOARDSIZE - col);
 					int nomove = distrow == 0 && distcol == 0;
 
 					int cantele = a == agentc && cow_has_tele;
 					if ((distrow > 1 || distcol > 1) && cantele) cow_has_tele = 0;
 
-					if (abs(loc / BOARDSIZE - row) > 1 && !cantele) row = loc / BOARDSIZE;
-					if (abs(loc % BOARDSIZE - col) > 1 && !cantele) col = loc % BOARDSIZE;
+					if (abs(prev / BOARDSIZE - row) > 1 && !cantele) loc = prev;
+					if (abs(prev % BOARDSIZE - col) > 1 && !cantele) loc = prev;
 
-					a->units[x] = row * BOARDSIZE + col;
-					sprintf(msg, "UPDATE %d %d %d %d", i, x, row, col);
+					if (a == agentf)
+					{
+						if (loc == loc_cloak) loc = prev;
+						if (loc == loc_decoy) loc = prev;
+						if (loc == loc_flwrs) loc = prev;
+						if (loc == loc_telep) loc = prev;
+					}
+					a->units[x] = loc;
 
 					if (iscow && a->units[x] == loc_cloak) 
 					{ loc_cloak = -1; P *= 0.5; }
@@ -256,6 +271,9 @@ int play_game()
 
 						agentc->units[agentc->count] = agentc->units[0];
 						agentc->count++;
+
+						sprintf(msg, "COUNT 0 %d", agentc->count);
+						tell_all(msg, -1);
 					}
 
 					if (iscow && a->units[x] == loc_flwrs)
@@ -271,9 +289,12 @@ int play_game()
 								--agentf->count;
 							}
 
-							sprintf(msg, "UPDATE 1 %d %d %d", j, agentf->units[j] / BOARDSIZE, agentf->units[j] % BOARDSIZE);
+							sprintf(msg, "UPDATE 1 %d %d %d 0", j, agentf->units[j] / BOARDSIZE, agentf->units[j] % BOARDSIZE);
 							tell_all(msg, -1);
 						}
+
+						sprintf(msg, "COUNT 1 %d", agentf->count);
+						tell_all(msg, -1);
 					}
 
 					if (iscow && a->units[x] == loc_telep)
@@ -283,7 +304,10 @@ int play_game()
 					int moo = (randf() < P && !nomove) || newfarmer;
 					a->mooed[x] = moo && a == agentc;
 
-					tell_all(msg, (a == agentf || moo) ? -1 : 0); // COW = 0
+					int issilent = (a == agentc && !moo);
+					row = loc / BOARDSIZE; col = loc % BOARDSIZE;
+					sprintf(msg, "UPDATE %d %d %d %d %d", i, x, row, col, issilent);
+					tell_all(msg, !issilent ? -1 : 1); // COW = 0
 					
 					// no more moves
 					if (nomove) break;

@@ -22,6 +22,7 @@ struct player_unit
 {
 	unsigned int id;
 	unsigned int row, col;
+	unsigned int last_update;
 };
 
 // player information

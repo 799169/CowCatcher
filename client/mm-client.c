@@ -125,6 +125,7 @@ int main(int argc, char **argv)
 
 	copyself(); game_setup(players);
 
+	unsigned int rnum;
 	while ((cc = recv(msg)))
 	{
 		sscanf(msg, "%s", tag);
@@ -132,7 +133,6 @@ int main(int argc, char **argv)
 		if (!strcmp(tag, "ENDGAME")) break;
 		else if (!strcmp(tag, "ROUND"))
 		{
-			unsigned int rnum;
 			sscanf(msg, "%*s %u", &rnum);
 
 			copyself();
@@ -140,11 +140,12 @@ int main(int argc, char **argv)
 		}
 		else if (!strcmp(tag, "UPDATE"))
 		{
-			unsigned int u, x, row, col;
-			sscanf(msg, "%*s %u %u %u %u", &u, &x, &row, &col);
+			unsigned int u, x, row, col, silent;
+			sscanf(msg, "%*s %u %u %u %u %d", &u, &x, &row, &col, &silent);
 
 			players[u].units[x].row = row;
 			players[u].units[x].col = col;
+			if (!silent) players[u].units[x].last_update = rnum;
 		}
 		else if (!strcmp(tag, "MOVE"))
 		{
@@ -154,6 +155,12 @@ int main(int argc, char **argv)
 			
 			sprintf(msg, "%d %d", SELF.units[x].row, SELF.units[x].col);
 			send(msg);
+		}
+		else if (!strcmp(tag, "COUNT"))
+		{
+			unsigned int x, c;
+			sscanf(msg, "%*s %u %u", &x, &c);
+			players[x].count = c;
 		}
 		// got an unexpected message...
 		else EXPECTED(tag, "ROUND/ENDGAME/MOVE/UPDATE");

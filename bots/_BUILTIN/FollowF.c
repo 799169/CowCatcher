@@ -23,15 +23,18 @@ void turn_start(unsigned int roundnum, const struct player_data* players)
 
 }
 
+#define OVERLAP(rd, cd, obj) (unit->row+(rd) == (obj).row && unit->col+(cd) == (obj).col)
+#define OVERLAP_ALL(rd, cd) (OVERLAP((rd), (cd), locCloak) || OVERLAP((rd), (cd), locDecoy) || OVERLAP((rd), (cd), locFlowers) || OVERLAP((rd), (cd), locTeleporter))
+
 // A unit (id + coordinates) is provided. Update its row/col before exiting.
 // row/col are zero indexed and range from 0 to BOARDSIZE
 void player_turn(struct player_unit* unit, const struct player_data* players)
 {
-	if (unit->row < players[0].units[0].row) ++unit->row;
-	else if (unit->row > players[0].units[0].row) --unit->row;
+	if (unit->row < players[0].units[0].row && !OVERLAP_ALL(1,0)) ++unit->row;
+	else if (unit->row > players[0].units[0].row && !OVERLAP_ALL(-1,0)) --unit->row;
 	
-	if (unit->col < players[0].units[0].col) ++unit->col;
-	else if (unit->col > players[0].units[0].col) --unit->col;
+	if (unit->col < players[0].units[0].col && !OVERLAP_ALL(0,1)) ++unit->col;
+	else if (unit->col > players[0].units[0].col && !OVERLAP_ALL(0,-1)) --unit->col;
 }
 
 // This function is called at the end of the game, as a courtesy.
